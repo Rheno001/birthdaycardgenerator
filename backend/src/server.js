@@ -13,6 +13,15 @@ const { initCron, triggerBirthdayCheck } = require('./cronService');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
+const BACKEND_URL = process.env.BACKEND_URL || `http://localhost:${PORT}`;
+
+// Resolves a stored picture path to a full URL the backend can loadImage() from
+function resolvePictureUrl(picture) {
+  if (!picture) return '';
+  if (picture.startsWith('http://') || picture.startsWith('https://')) return picture;
+  // It's a relative path like /uploads/photo-xxx.webp
+  return `${BACKEND_URL}${picture}`;
+}
 
 // Setup Cloudinary if credentials provided
 if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) {
@@ -146,7 +155,7 @@ app.post('/api/members/:id/send-card', async (req, res) => {
     const cardBuffer = await generateBirthdayCard({
       name: member.name,
       designation: member.designation,
-      picture: member.picture,
+      picture: resolvePictureUrl(member.picture),
       quote: settings.quote_text,
       logoUrl: settings.logo_url
     });

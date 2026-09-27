@@ -3,6 +3,14 @@ const db = require('./db');
 const { generateBirthdayCard } = require('./cardGenerator');
 const { sendBirthdayEmail } = require('./resendService');
 
+const BACKEND_URL = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5001}`;
+
+function resolvePictureUrl(picture) {
+  if (!picture) return '';
+  if (picture.startsWith('http://') || picture.startsWith('https://')) return picture;
+  return `${BACKEND_URL}${picture}`;
+}
+
 /**
  * Checks for team members with birthdays today and sends their cards.
  */
@@ -20,7 +28,7 @@ async function triggerBirthdayCheck() {
       const cardBuffer = await generateBirthdayCard({
         name: member.name,
         designation: member.designation,
-        picture: member.picture,
+        picture: resolvePictureUrl(member.picture),
         quote: settings.quote_text,
         logoUrl: settings.logo_url
       });

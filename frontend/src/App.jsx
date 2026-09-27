@@ -352,7 +352,6 @@ export default function App() {
           <img src="/cpp-log.png" alt="Compliance Professionals PLC" className="brand-logo-img" />
           <div>
             <div className="brand-title">Birthday Card Generator</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Compliance Professionals PLC</div>
           </div>
         </div>
 
