@@ -38,10 +38,12 @@ async function sendBirthdayEmail({ member, cardBuffer }) {
           .content { padding: 24px; text-align: center; }
           .content-text { font-size: 16px; line-height: 1.6; color: #475569; }
           .card-img { width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-top: 15px; }
+          .footer { background: #f8fafc; padding: 20px; text-align: center; font-size: 13px; color: #64748b; border-top: 1px solid #e2e8f0; }
           @media (prefers-color-scheme: dark) {
             body { background-color: #0f172a; color: #f8fafc; }
             .container { background-color: #1e293b; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
             .content-text { color: #e2e8f0; }
+            .footer { background-color: #1e293b; border-top-color: #334155; color: #94a3b8; }
           }
         </style>
       </head>
@@ -54,9 +56,12 @@ async function sendBirthdayEmail({ member, cardBuffer }) {
           <div class="content">
             <p class="content-text">
               On behalf of the entire team, we want to wish you a very Happy Birthday! 
-              Thank you for being such a valued part of our organization as <strong>${member.designation || 'Team Member'}</strong>.
+              Thank you for being such a valued part of our organization.
             </p>
-            <img src="data:image/png;base64,${cardBase64}" alt="Birthday Card" class="card-img" />
+            <img src="cid:birthday-card" alt="Birthday Card" class="card-img" />
+          </div>
+          <div class="footer">
+            <p>Sent with ❤️ from CPP</p>
           </div>
         </div>
       </body>
@@ -73,7 +78,9 @@ async function sendBirthdayEmail({ member, cardBuffer }) {
         {
           filename: `Birthday_Card_${member.name.replace(/\s+/g, '_')}.png`,
           content: cardBuffer,
-          content_type: 'image/png'
+          content_type: 'image/png',
+          content_id: 'birthday-card',
+          cid: 'birthday-card'
         }
       ]
     });
