@@ -42,7 +42,7 @@ export default function App() {
 
   // Preview Member State for Card Studio tab
   const [selectedPreviewMember, setSelectedPreviewMember] = useState(null);
-  
+
   // Custom Card Studio Form state
   const [studioQuote, setStudioQuote] = useState('Wishing you a beautiful day with good health and happiness forever.');
 
@@ -312,7 +312,7 @@ export default function App() {
     let m = '01', d = '01';
     if (parts.length === 3) { m = parts[1]; d = parts[2]; }
     else if (parts.length === 2) { m = parts[0]; d = parts[1]; }
-    
+
     const mItem = MONTHS.find(item => item.value === m);
     const mLabel = mItem ? mItem.label.substring(0, 3) : m;
     return `${mLabel} ${parseInt(d, 10)}`;
@@ -639,7 +639,6 @@ export default function App() {
                   <th>Recipient Name</th>
                   <th>Recipient Email</th>
                   <th>Status</th>
-                  <th>Resend Delivery ID</th>
                   <th>Sent Timestamp</th>
                 </tr>
               </thead>
@@ -667,7 +666,6 @@ export default function App() {
                           {log.status}
                         </span>
                       </td>
-                      <td><code style={{ fontSize: '12px', color: 'var(--accent-brand-dark)', fontWeight: '600' }}>{log.resend_id || 'N/A'}</code></td>
                       <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
                         {new Date(log.sent_at).toLocaleString()}
                       </td>
@@ -705,14 +703,8 @@ export default function App() {
             </div>
 
             <div className="card-panel">
-              <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: 16 }}>Backend Status & Service Info</h3>
+              <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: 16 }}>Service Info</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: '14px' }}>
-                <div style={{ background: '#f8fafc', padding: 14, borderRadius: 8, border: '1px solid var(--border-color)' }}>
-                  <div style={{ color: 'var(--accent-brand-dark)', fontWeight: '700' }}>✅ Backend Configuration</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: 4 }}>
-                    Environment variables configured via backend <code>.env</code> file or host environment settings.
-                  </div>
-                </div>
 
                 <div style={{ background: '#f8fafc', padding: 14, borderRadius: 8, border: '1px solid var(--border-color)' }}>
                   <div style={{ color: 'var(--accent-brand-dark)', fontWeight: '700' }}>⏰ Automated Daily Cron</div>
@@ -721,12 +713,6 @@ export default function App() {
                   </div>
                 </div>
 
-                <div style={{ background: '#f8fafc', padding: 14, borderRadius: 8, border: '1px solid var(--border-color)' }}>
-                  <div style={{ color: 'var(--accent-brand-dark)', fontWeight: '700' }}>🎨 Brand Logo & Theme</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: 4 }}>
-                    Branded for <strong>Compliance Professionals PLC</strong> using logo at <code>frontend/assets/cpp-log.png</code>.
-                  </div>
-                </div>
               </div>
             </div>
           </div>
