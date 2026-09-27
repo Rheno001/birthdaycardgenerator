@@ -34,20 +34,20 @@ const getLocalData = () => {
       members: [
         {
           id: 1,
-          name: "Alexander Wright",
-          email: "alexander@example.com",
-          birthday: "09-27",
-          picture: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600&auto=format&fit=crop&q=80",
-          designation: "Senior Lead Architect",
+          name: "John Doe",
+          email: "john.doe@example.com",
+          birthday: "06-15",
+          picture: "",
+          designation: "Software Engineer",
           created_at: new Date().toISOString()
         },
         {
           id: 2,
-          name: "Sophia Chen",
-          email: "sophia@example.com",
-          birthday: "10-15",
-          picture: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80",
-          designation: "UI/UX Product Designer",
+          name: "Jane Smith",
+          email: "jane.smith@example.com",
+          birthday: "03-22",
+          picture: "",
+          designation: "Product Manager",
           created_at: new Date().toISOString()
         }
       ],
