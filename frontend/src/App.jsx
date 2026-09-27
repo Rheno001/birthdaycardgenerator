@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import CardPreview from './components/CardPreview';
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 const MONTHS = [
   { value: '01', label: 'January' },
   { value: '02', label: 'February' },
@@ -61,7 +63,7 @@ export default function App() {
 
   const fetchMembers = async () => {
     try {
-      const res = await fetch('/api/members');
+      const res = await fetch(API_BASE + '/api/members');
       const data = await res.json();
       if (data.success) {
         setMembers(data.data);
@@ -76,7 +78,7 @@ export default function App() {
 
   const fetchLogs = async () => {
     try {
-      const res = await fetch('/api/logs');
+      const res = await fetch(API_BASE + '/api/logs');
       const data = await res.json();
       if (data.success) setLogs(data.data);
     } catch (e) {
@@ -86,7 +88,7 @@ export default function App() {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch('/api/settings');
+      const res = await fetch(API_BASE + '/api/settings');
       const data = await res.json();
       if (data.success && data.data && data.data.quote_text) {
         setQuoteText(data.data.quote_text);
@@ -136,7 +138,7 @@ export default function App() {
     e.preventDefault();
     setLoading(true);
     try {
-      const url = editingMember ? `/api/members/${editingMember.id}` : '/api/members';
+      const url = editingMember ? `\${API_BASE}/api/members/${editingMember.id}` : API_BASE + '/api/members';
       const method = editingMember ? 'PUT' : 'POST';
 
       const birthdayFormatted = `${memberForm.birthdayMonth}-${memberForm.birthdayDay.padStart(2, '0')}`;
@@ -174,7 +176,7 @@ export default function App() {
   const handleDeleteMember = async (id) => {
     if (!confirm('Are you sure you want to delete this team member?')) return;
     try {
-      const res = await fetch(`/api/members/${id}`, { method: 'DELETE' });
+      const res = await fetch(`\${API_BASE}/api/members/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         showToast('Member deleted.', 'info');
@@ -189,7 +191,7 @@ export default function App() {
     setLoading(true);
     showToast(`Generating and sending card email to ${member.email}...`, 'info');
     try {
-      const res = await fetch(`/api/members/${member.id}/send-card`, { method: 'POST' });
+      const res = await fetch(`\${API_BASE}/api/members/${member.id}/send-card`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         showToast(`Birthday Card successfully sent to ${member.name}!`, 'success');
@@ -223,7 +225,7 @@ export default function App() {
         quote: quoteText
       }).toString();
 
-      const response = await fetch(`/api/card/preview?${query}`);
+      const response = await fetch(`\${API_BASE}/api/card/preview?${query}`);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -243,7 +245,7 @@ export default function App() {
     setLoading(true);
     showToast('Running daily birthday check...', 'info');
     try {
-      const res = await fetch('/api/cron/trigger', { method: 'POST' });
+      const res = await fetch(API_BASE + '/api/cron/trigger', { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         const count = data.report.checkedCount;
@@ -260,7 +262,7 @@ export default function App() {
   const handleSaveQuote = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/settings', {
+      const res = await fetch(API_BASE + '/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quote_text: quoteText })
@@ -282,7 +284,7 @@ export default function App() {
 
     try {
       showToast('Uploading image...', 'info');
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const res = await fetch(API_BASE + '/api/upload', { method: 'POST', body: formData });
       const data = await res.json();
       if (data.success) {
         setMemberForm({ ...memberForm, picture: data.url });

@@ -69,7 +69,7 @@ const CardPreview = forwardRef(({ member, quote, logoUrl, width = 1000, height =
     const logoImg = new Image();
     logoImg.crossOrigin = 'Anonymous';
     logoImg.onload = () => {
-      ctx.drawImage(logoImg, 65, 75, 280, 65);
+      ctx.drawImage(logoImg, 50, 100, 400, 65);
     };
     logoImg.onerror = () => drawFallbackLogo(ctx, cppBrandGreen);
     logoImg.src = activeLogo;

@@ -27,14 +27,22 @@ async function sendBirthdayEmail({ member, cardBuffer }) {
       <head>
         <meta charset="utf-8">
         <style>
+          :root {
+            color-scheme: light dark;
+          }
           body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
           .container { max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-          .header { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: #ffffff; padding: 30px 20px; text-align: center; }
-          .header h1 { margin: 0; font-size: 28px; font-weight: 700; color: #fbbf24; letter-spacing: 1px; }
-          .header p { margin: 8px 0 0 0; font-size: 16px; opacity: 0.9; }
+          .header { background: #9abf49; color: #ffffff; padding: 30px 20px; text-align: center; }
+          .header h1 { margin: 0; font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: 1px; }
+          .header p { margin: 8px 0 0 0; font-size: 16px; color: #ffffff; opacity: 0.9; }
           .content { padding: 24px; text-align: center; }
+          .content-text { font-size: 16px; line-height: 1.6; color: #475569; }
           .card-img { width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-top: 15px; }
-          .footer { background: #f8fafc; padding: 20px; text-align: center; font-size: 13px; color: #64748b; border-top: 1px solid #e2e8f0; }
+          @media (prefers-color-scheme: dark) {
+            body { background-color: #0f172a; color: #f8fafc; }
+            .container { background-color: #1e293b; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+            .content-text { color: #e2e8f0; }
+          }
         </style>
       </head>
       <body>
@@ -44,14 +52,11 @@ async function sendBirthdayEmail({ member, cardBuffer }) {
             <p>Wishing you an extraordinary day filled with joy and success!</p>
           </div>
           <div class="content">
-            <p style="font-size: 16px; line-height: 1.6; color: #475569;">
+            <p class="content-text">
               On behalf of the entire team, we want to wish you a very Happy Birthday! 
               Thank you for being such a valued part of our organization as <strong>${member.designation || 'Team Member'}</strong>.
             </p>
-            <img src="cid:birthday-card" alt="Birthday Card" class="card-img" />
-          </div>
-          <div class="footer">
-            <p>Automated Birthday Wishes System • Sent with ❤️</p>
+            <img src="data:image/png;base64,${cardBase64}" alt="Birthday Card" class="card-img" />
           </div>
         </div>
       </body>
@@ -60,16 +65,15 @@ async function sendBirthdayEmail({ member, cardBuffer }) {
 
   try {
     const data = await resend.emails.send({
-      from: `Birthday System <${sender}>`,
+      from: `Happy Birthday <${sender}>`,
       to: [member.email],
-      subject: `🎉 Happy Birthday ${member.name}!`,
+      subject: `\u200B`,
       html: htmlContent,
       attachments: [
         {
           filename: `Birthday_Card_${member.name.replace(/\s+/g, '_')}.png`,
-          content: cardBase64,
-          content_type: 'image/png',
-          cid: 'birthday-card'
+          content: cardBuffer,
+          content_type: 'image/png'
         }
       ]
     });
