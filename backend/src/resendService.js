@@ -55,7 +55,7 @@ async function sendBirthdayEmail({ member, cardBuffer }) {
           </div>
           <div class="content">
             <p class="content-text">
-              On behalf of the entire team, we want to wish you a very Happy Birthday! 
+              On behalf of the entire CPP team, we want to wish you a very Happy Birthday! 
               Thank you for being such a valued part of our organization.
             </p>
             <img src="cid:birthday-card" alt="Birthday Card" class="card-img" />
