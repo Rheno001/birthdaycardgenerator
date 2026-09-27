@@ -715,7 +715,7 @@ export default function App() {
                 <div style={{ background: '#f8fafc', padding: 14, borderRadius: 8, border: '1px solid var(--border-color)' }}>
                   <div style={{ color: 'var(--accent-brand-dark)', fontWeight: '700' }}>⏰ Automated Daily Cron</div>
                   <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: 4 }}>
-                    Scheduled daily at <strong>08:00 AM</strong> to send birthday cards to team members whose birthday is today.
+                    Scheduled daily at <strong>06:00 AM</strong> to send birthday cards to team members whose birthday is today.
                   </div>
                 </div>
 

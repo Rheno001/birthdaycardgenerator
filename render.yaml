@@ -24,8 +24,8 @@ services:
         source: /*
         destination: /index.html
 
-# Daily Cron Job on Render (fires daily at 08:00 UTC)
+# Daily Cron Job on Render (fires daily at 06:00 AM)
 cron:
   - name: daily-birthday-card-check
-    schedule: "0 8 * * *"
+    schedule: "0 6 * * *"
     command: curl -X POST https://birthday-card-backend.onrender.com/api/cron/trigger

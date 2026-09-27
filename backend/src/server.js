@@ -1,9 +1,10 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const cloudinary = require('cloudinary').v2;
 
 const db = require('./db');
 const { generateBirthdayCard } = require('./cardGenerator');
@@ -12,6 +13,16 @@ const { initCron, triggerBirthdayCheck } = require('./cronService');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
+
+// Setup Cloudinary if credentials provided
+if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+  });
+  console.log('[Cloudinary] Configured for image uploads.');
+}
 
 // Setup Uploads Directory
 const UPLOADS_DIR = path.join(__dirname, '../uploads');
@@ -84,14 +95,26 @@ app.delete('/api/members/:id', async (req, res) => {
   }
 });
 
-// File Upload endpoint for picture
-app.post('/api/upload', upload.single('file'), (req, res) => {
+// File Upload endpoint for picture (supports Cloudinary & local disk)
+app.post('/api/upload', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
+  
+  if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) {
+    try {
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        folder: 'cpp_birthday_cards'
+      });
+      return res.json({ success: true, url: result.secure_url });
+    } catch (err) {
+      console.error('[Cloudinary] Upload failed, falling back to local server URL:', err.message);
+    }
+  }
+
   const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
   res.json({ success: true, url: fileUrl });
 });
 
-// 2. Card Preview Endpoint (returns PNG buffer image directly or base64)
+// 2. Card Preview Endpoint
 app.get('/api/card/preview', async (req, res) => {
   try {
     const { name, designation, picture, quote, logoUrl } = req.query;

@@ -1,3 +1,4 @@
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
@@ -35,7 +36,7 @@ const getLocalData = () => {
           id: 1,
           name: "Alexander Wright",
           email: "alexander@example.com",
-          birthday: "1995-09-27",
+          birthday: "09-27",
           picture: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=600&auto=format&fit=crop&q=80",
           designation: "Senior Lead Architect",
           created_at: new Date().toISOString()
@@ -44,7 +45,7 @@ const getLocalData = () => {
           id: 2,
           name: "Sophia Chen",
           email: "sophia@example.com",
-          birthday: "1998-10-15",
+          birthday: "10-15",
           picture: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80",
           designation: "UI/UX Product Designer",
           created_at: new Date().toISOString()
@@ -71,8 +72,9 @@ const saveLocalData = (data) => {
 // Database Initialization
 async function initDB() {
   if (isPg && pool) {
-    const client = await pool.connect();
+    let client;
     try {
+      client = await pool.connect();
       await client.query(`
         CREATE TABLE IF NOT EXISTS members (
           id SERIAL PRIMARY KEY,
@@ -99,11 +101,12 @@ async function initDB() {
           value TEXT
         );
       `);
-      console.log('[DB] PostgreSQL tables verified.');
+      console.log('[DB] Neon PostgreSQL tables verified.');
     } catch (err) {
-      console.error('[DB] Schema init error:', err.message);
+      console.error('[DB] Schema init error, using local fallback:', err.message);
+      isPg = false;
     } finally {
-      client.release();
+      if (client) client.release();
     }
   } else {
     getLocalData(); // Ensures local JSON file exists
@@ -118,8 +121,13 @@ const db = {
   // Members
   async getMembers() {
     if (isPg && pool) {
-      const res = await pool.query('SELECT * FROM members ORDER BY id DESC');
-      return res.rows;
+      try {
+        const res = await pool.query('SELECT * FROM members ORDER BY id DESC');
+        return res.rows;
+      } catch (e) {
+        console.error('[DB] PostgreSQL query failed, using local store:', e.message);
+        return getLocalData().members || [];
+      }
     } else {
       const data = getLocalData();
       return data.members || [];
@@ -128,55 +136,68 @@ const db = {
 
   async addMember({ name, email, birthday, picture, designation }) {
     if (isPg && pool) {
-      const res = await pool.query(
-        'INSERT INTO members (name, email, birthday, picture, designation) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [name, email, birthday, picture || '', designation || '']
-      );
-      return res.rows[0];
-    } else {
-      const data = getLocalData();
-      const newMember = {
-        id: Date.now(),
-        name,
-        email,
-        birthday,
-        picture: picture || '',
-        designation: designation || '',
-        created_at: new Date().toISOString()
-      };
-      data.members.unshift(newMember);
-      saveLocalData(data);
-      return newMember;
+      try {
+        const res = await pool.query(
+          'INSERT INTO members (name, email, birthday, picture, designation) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+          [name, email, birthday, picture || '', designation || '']
+        );
+        return res.rows[0];
+      } catch (e) {
+        console.error('[DB] PostgreSQL insert failed, fallback to local:', e.message);
+      }
     }
+    
+    const data = getLocalData();
+    const newMember = {
+      id: Date.now(),
+      name,
+      email,
+      birthday,
+      picture: picture || '',
+      designation: designation || '',
+      created_at: new Date().toISOString()
+    };
+    data.members.unshift(newMember);
+    saveLocalData(data);
+    return newMember;
   },
 
   async updateMember(id, { name, email, birthday, picture, designation }) {
     if (isPg && pool) {
-      const res = await pool.query(
-        'UPDATE members SET name=$1, email=$2, birthday=$3, picture=$4, designation=$5 WHERE id=$6 RETURNING *',
-        [name, email, birthday, picture, designation, id]
-      );
-      return res.rows[0];
-    } else {
-      const data = getLocalData();
-      const idx = data.members.findIndex(m => m.id == id);
-      if (idx !== -1) {
-        data.members[idx] = { ...data.members[idx], name, email, birthday, picture, designation };
-        saveLocalData(data);
-        return data.members[idx];
+      try {
+        const res = await pool.query(
+          'UPDATE members SET name=$1, email=$2, birthday=$3, picture=$4, designation=$5 WHERE id=$6 RETURNING *',
+          [name, email, birthday, picture, designation, id]
+        );
+        return res.rows[0];
+      } catch (e) {
+        console.error('[DB] PostgreSQL update failed, fallback to local:', e.message);
       }
-      return null;
     }
+    
+    const data = getLocalData();
+    const idx = data.members.findIndex(m => m.id == id);
+    if (idx !== -1) {
+      data.members[idx] = { ...data.members[idx], name, email, birthday, picture, designation };
+      saveLocalData(data);
+      return data.members[idx];
+    }
+    return null;
   },
 
   async deleteMember(id) {
     if (isPg && pool) {
-      await pool.query('DELETE FROM members WHERE id=$1', [id]);
-    } else {
-      const data = getLocalData();
-      data.members = data.members.filter(m => m.id != id);
-      saveLocalData(data);
+      try {
+        await pool.query('DELETE FROM members WHERE id=$1', [id]);
+        return { success: true };
+      } catch (e) {
+        console.error('[DB] PostgreSQL delete failed, fallback to local:', e.message);
+      }
     }
+    
+    const data = getLocalData();
+    data.members = data.members.filter(m => m.id != id);
+    saveLocalData(data);
     return { success: true };
   },
 
@@ -189,7 +210,6 @@ const db = {
     const members = await this.getMembers();
     return members.filter(m => {
       if (!m.birthday) return false;
-      // Handle both YYYY-MM-DD or MM-DD formats
       const parts = m.birthday.split('-');
       if (parts.length === 3) {
         return `${parts[1]}-${parts[2]}` === targetMMDD;
@@ -203,65 +223,82 @@ const db = {
   // Email Logs
   async logEmailSent({ member_id, member_name, member_email, status, resend_id }) {
     if (isPg && pool) {
-      const res = await pool.query(
-        'INSERT INTO email_logs (member_id, member_name, member_email, status, resend_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [member_id, member_name, member_email, status, resend_id || '']
-      );
-      return res.rows[0];
-    } else {
-      const data = getLocalData();
-      const log = {
-        id: Date.now(),
-        member_id,
-        member_name,
-        member_email,
-        status,
-        resend_id: resend_id || '',
-        sent_at: new Date().toISOString()
-      };
-      if (!data.logs) data.logs = [];
-      data.logs.unshift(log);
-      saveLocalData(data);
-      return log;
+      try {
+        const res = await pool.query(
+          'INSERT INTO email_logs (member_id, member_name, member_email, status, resend_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+          [member_id, member_name, member_email, status, resend_id || '']
+        );
+        return res.rows[0];
+      } catch (e) {
+        console.error('[DB] PostgreSQL log insert failed:', e.message);
+      }
     }
+    
+    const data = getLocalData();
+    const log = {
+      id: Date.now(),
+      member_id,
+      member_name,
+      member_email,
+      status,
+      resend_id: resend_id || '',
+      sent_at: new Date().toISOString()
+    };
+    if (!data.logs) data.logs = [];
+    data.logs.unshift(log);
+    saveLocalData(data);
+    return log;
   },
 
   async getEmailLogs() {
     if (isPg && pool) {
-      const res = await pool.query('SELECT * FROM email_logs ORDER BY id DESC LIMIT 50');
-      return res.rows;
-    } else {
-      const data = getLocalData();
-      return data.logs || [];
+      try {
+        const res = await pool.query('SELECT * FROM email_logs ORDER BY id DESC LIMIT 50');
+        return res.rows;
+      } catch (e) {
+        console.error('[DB] PostgreSQL get logs failed:', e.message);
+      }
     }
+    
+    const data = getLocalData();
+    return data.logs || [];
   },
 
   // Settings
   async getSettings() {
     if (isPg && pool) {
-      const res = await pool.query('SELECT * FROM settings');
-      const map = {};
-      res.rows.forEach(r => map[r.key] = r.value);
-      return map;
-    } else {
-      const data = getLocalData();
-      return data.settings || {};
+      try {
+        const res = await pool.query('SELECT * FROM settings');
+        const map = {};
+        res.rows.forEach(r => map[r.key] = r.value);
+        return map;
+      } catch (e) {
+        console.error('[DB] PostgreSQL get settings failed:', e.message);
+      }
     }
+    
+    const data = getLocalData();
+    return data.settings || {};
   },
 
   async saveSettings(settingsObj) {
     if (isPg && pool) {
-      for (const [key, value] of Object.entries(settingsObj)) {
-        await pool.query(
-          'INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
-          [key, String(value)]
-        );
+      try {
+        for (const [key, value] of Object.entries(settingsObj)) {
+          await pool.query(
+            'INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
+            [key, String(value)]
+          );
+        }
+        return true;
+      } catch (e) {
+        console.error('[DB] PostgreSQL save settings failed:', e.message);
       }
-    } else {
-      const data = getLocalData();
-      data.settings = { ...data.settings, ...settingsObj };
-      saveLocalData(data);
     }
+    
+    const data = getLocalData();
+    data.settings = { ...data.settings, ...settingsObj };
+    saveLocalData(data);
     return true;
   }
 };

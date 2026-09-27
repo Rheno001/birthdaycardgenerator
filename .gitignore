@@ -1,0 +1,33 @@
+# Dependency directories
+node_modules/
+**/node_modules/
+jspm_packages/
+
+# Environment files
+.env
+*.env
+.env.*
+**/.env
+**/.env.*
+
+# Uploads and temporary files
+uploads/
+**/uploads/
+*.log
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Mac OS
+.DS_Store
+
+# Build output
+dist/
+build/
+
+# Database files
+data/db.json
+**/db.json

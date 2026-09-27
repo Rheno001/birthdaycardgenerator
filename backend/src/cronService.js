@@ -11,7 +11,7 @@ async function triggerBirthdayCheck() {
   const settings = await db.getSettings();
   const todaysBirthdays = await db.getMembersWithBirthdayToday();
 
-  console.log(`[Cron] Found ${todaysBirthdays.length} members with birthday today.`);
+  console.log(`[Cron] Found ${todaysBirthdays.length} member(s) with birthday today.`);
 
   const results = [];
   for (const member of todaysBirthdays) {
@@ -40,12 +40,12 @@ async function triggerBirthdayCheck() {
 }
 
 function initCron() {
-  // Runs every day at 08:00 AM server time
-  cron.schedule('0 8 * * *', async () => {
-    console.log('[Cron] Daily scheduled task triggered');
+  // Runs every day at 06:00 AM server time
+  cron.schedule('0 6 * * *', async () => {
+    console.log('[Cron] Daily scheduled birthday task triggered at 06:00 AM');
     await triggerBirthdayCheck();
   });
-  console.log('[Cron] Daily cron job scheduled for 08:00 AM everyday.');
+  console.log('[Cron] Daily cron job scheduled for 06:00 AM everyday.');
 }
 
 module.exports = { initCron, triggerBirthdayCheck };
