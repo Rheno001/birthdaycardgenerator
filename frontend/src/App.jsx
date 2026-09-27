@@ -138,7 +138,7 @@ export default function App() {
     e.preventDefault();
     setLoading(true);
     try {
-      const url = editingMember ? `\${API_BASE}/api/members/${editingMember.id}` : API_BASE + '/api/members';
+      const url = editingMember ? `${API_BASE}/api/members/${editingMember.id}` : API_BASE + '/api/members';
       const method = editingMember ? 'PUT' : 'POST';
 
       const birthdayFormatted = `${memberForm.birthdayMonth}-${memberForm.birthdayDay.padStart(2, '0')}`;
@@ -176,7 +176,7 @@ export default function App() {
   const handleDeleteMember = async (id) => {
     if (!confirm('Are you sure you want to delete this team member?')) return;
     try {
-      const res = await fetch(`\${API_BASE}/api/members/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/api/members/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         showToast('Member deleted.', 'info');
@@ -191,7 +191,7 @@ export default function App() {
     setLoading(true);
     showToast(`Generating and sending card email to ${member.email}...`, 'info');
     try {
-      const res = await fetch(`\${API_BASE}/api/members/${member.id}/send-card`, { method: 'POST' });
+      const res = await fetch(`${API_BASE}/api/members/${member.id}/send-card`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
         showToast(`Birthday Card successfully sent to ${member.name}!`, 'success');
@@ -225,7 +225,7 @@ export default function App() {
         quote: quoteText
       }).toString();
 
-      const response = await fetch(`\${API_BASE}/api/card/preview?${query}`);
+      const response = await fetch(`${API_BASE}/api/card/preview?${query}`);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -437,7 +437,7 @@ export default function App() {
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                             <img
-                              src={m.picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
+                              src={(m.picture && m.picture.replace(/^http:\/\/localhost:\d+/, API_BASE)) || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
                               alt={m.name}
                               className="member-avatar"
                             />
