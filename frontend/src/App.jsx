@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import CardPreview from './components/CardPreview';
+import LoginPage from './components/LoginPage';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -26,7 +27,11 @@ const TABS = [
 ];
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('isLoggedIn') === 'true';
+  });
   const [activeTab, setActiveTab] = useState('members');
+
   const [members, setMembers]     = useState([]);
   const [logs, setLogs]           = useState([]);
   const [quoteText, setQuoteText] = useState('Wishing you a beautiful day with good health and happiness forever.');
@@ -266,6 +271,20 @@ export default function App() {
     return 'failed';
   };
 
+  const handleLogin = () => {
+    localStorage.setItem('isLoggedIn', 'true');
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('isLoggedIn');
+    setIsAuthenticated(false);
+  };
+
+  if (!isAuthenticated) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
+
   return (
     <div className="app-container">
 
@@ -298,8 +317,12 @@ export default function App() {
           <button className="btn-secondary" onClick={handleTriggerDailyCron} disabled={!!loadingKey}>
             {isLoading('cron') ? <><span className="btn-spinner-dark" /> Checking...</> : '⚡ Run Check'}
           </button>
+          <button className="btn-secondary" onClick={handleLogout} title="Log out of application">
+            🚪 Logout
+          </button>
         </div>
       </header>
+
 
       {/* ── Navigation ── */}
       <nav className="nav-tabs">
