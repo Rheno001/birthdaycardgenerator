@@ -23,37 +23,30 @@ function resolvePictureUrl(picture) {
   return `${BACKEND_URL}${picture}`;
 }
 
-// Setup Cloudinary if credentials provided
-if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) {
+// Setup Cloudinary credentials (trimming quotes if present)
+const cloudName = (process.env.CLOUDINARY_CLOUD_NAME || '').replace(/^["']|["']$/g, '').trim();
+const apiKey    = (process.env.CLOUDINARY_API_KEY || '').replace(/^["']|["']$/g, '').trim();
+const apiSecret = (process.env.CLOUDINARY_API_SECRET || '').replace(/^["']|["']$/g, '').trim();
+
+if (cloudName && apiKey && apiSecret) {
   cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
+    cloud_name: cloudName,
+    api_key: apiKey,
+    api_secret: apiSecret
   });
-  console.log('[Cloudinary] Configured for image uploads.');
+  console.log(`[Cloudinary] Configured for image uploads (Cloud: ${cloudName}).`);
 }
 
-// Setup Uploads Directory
-const UPLOADS_DIR = path.join(__dirname, '../uploads');
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
-
-// Multer Storage Configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `photo-${Date.now()}${ext}`);
-  }
+// Multer Storage Configuration (MemoryStorage for Cloudinary streaming)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }
 });
-const upload = multer({ storage });
 
 // Middlewares
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Initialize Database & Cron
 db.initDB();
@@ -104,23 +97,36 @@ app.delete('/api/members/:id', async (req, res) => {
   }
 });
 
-// File Upload endpoint for picture (supports Cloudinary & local disk)
+// File Upload endpoint for picture (Uploads to Cloudinary & returns secure_url)
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
-  
-  if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) {
+
+  if (cloudName && apiKey && apiSecret) {
     try {
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: 'cpp_birthday_cards'
+      const uploadPromise = new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder: 'cpp_birthday_cards',
+            resource_type: 'auto'
+          },
+          (error, result) => {
+            if (error) return reject(error);
+            resolve(result);
+          }
+        );
+        stream.end(req.file.buffer);
       });
+
+      const result = await uploadPromise;
+      console.log('[Cloudinary] Upload success:', result.secure_url);
       return res.json({ success: true, url: result.secure_url });
     } catch (err) {
-      console.error('[Cloudinary] Upload failed, falling back to local server URL:', err.message);
+      console.error('[Cloudinary] Upload error:', err.message || err);
+      return res.status(500).json({ success: false, error: `Cloudinary upload failed: ${err.message || 'Unknown error'}` });
     }
   }
 
-  const fileUrl = `/uploads/${req.file.filename}`;
-  res.json({ success: true, url: fileUrl });
+  return res.status(500).json({ success: false, error: 'Cloudinary credentials missing on backend server.' });
 });
 
 // 2. Card Preview Endpoint

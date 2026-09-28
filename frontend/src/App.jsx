@@ -207,11 +207,16 @@ export default function App() {
     const formData = new FormData();
     formData.append('file', file);
     try {
-      showToast('Uploading photo...', 'info');
+      showToast('Uploading photo to Cloudinary...', 'info');
       const res  = await fetch(API_BASE + '/api/upload', { method: 'POST', body: formData });
       const data = await res.json();
-      if (data.success) { setMemberForm({ ...memberForm, picture: data.url }); showToast('Photo uploaded!', 'success'); }
-    } catch (err) { showToast('Upload failed.', 'error'); }
+      if (data.success) {
+        setMemberForm((prev) => ({ ...prev, picture: data.url }));
+        showToast('Photo uploaded!', 'success');
+      } else {
+        showToast(`Upload failed: ${data.error}`, 'error');
+      }
+    } catch (err) { showToast(`Upload failed: ${err.message}`, 'error'); }
     finally { stopLoad(); }
   };
 
@@ -369,7 +374,15 @@ export default function App() {
                       <tr key={m.id}>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <img src={resolveAvatar(m.picture)} alt={m.name} className="member-avatar" />
+                            <img
+                              src={resolveAvatar(m.picture)}
+                              alt={m.name}
+                              className="member-avatar"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
+                              }}
+                            />
                             <div>
                               <div className="member-name">
                                 {m.name}
