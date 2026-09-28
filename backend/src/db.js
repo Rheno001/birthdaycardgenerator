@@ -86,6 +86,9 @@ async function initDB() {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
+        ALTER TABLE members ADD COLUMN IF NOT EXISTS photo_data BYTEA;
+        ALTER TABLE members ADD COLUMN IF NOT EXISTS photo_mime VARCHAR(100);
+
         CREATE TABLE IF NOT EXISTS email_logs (
           id SERIAL PRIMARY KEY,
           member_id INT,
@@ -101,7 +104,7 @@ async function initDB() {
           value TEXT
         );
       `);
-      console.log('[DB] Neon PostgreSQL tables verified.');
+      console.log('[DB] Neon PostgreSQL tables & BYTEA photo columns verified.');
     } catch (err) {
       console.error('[DB] Schema init error, using local fallback:', err.message);
       isPg = false;
@@ -118,12 +121,17 @@ async function initDB() {
 const db = {
   initDB,
   
-  // Members
+  // Members - EXCLUDES photo_data bytea column for high performance
   async getMembers() {
     if (isPg && pool) {
       try {
-        const res = await pool.query('SELECT * FROM members ORDER BY id DESC');
-        return res.rows;
+        const res = await pool.query(
+          'SELECT id, name, email, birthday, picture, designation, created_at, photo_mime, (photo_data IS NOT NULL) AS has_photo FROM members ORDER BY id DESC'
+        );
+        return res.rows.map(m => ({
+          ...m,
+          picture: m.picture || (m.has_photo ? `/api/members/${m.id}/photo` : '')
+        }));
       } catch (e) {
         console.error('[DB] PostgreSQL query failed, using local store:', e.message);
         return getLocalData().members || [];
@@ -135,13 +143,31 @@ const db = {
   },
 
   async addMember({ name, email, birthday, picture, designation }) {
+    let photoBuffer = null;
+    let photoMime = null;
+    let pictureUrl = picture || '';
+
+    if (pictureUrl.startsWith('data:image/')) {
+      const matches = pictureUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+      if (matches) {
+        photoMime = matches[1];
+        photoBuffer = Buffer.from(matches[2], 'base64');
+      }
+    }
+
     if (isPg && pool) {
       try {
         const res = await pool.query(
-          'INSERT INTO members (name, email, birthday, picture, designation) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-          [name, email, birthday, picture || '', designation || '']
+          'INSERT INTO members (name, email, birthday, picture, designation, photo_data, photo_mime) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, name, email, birthday, picture, designation, created_at',
+          [name, email, birthday, pictureUrl, designation || '', photoBuffer, photoMime]
         );
-        return res.rows[0];
+        const member = res.rows[0];
+        if (photoBuffer && member?.id) {
+          pictureUrl = `/api/members/${member.id}/photo`;
+          await pool.query('UPDATE members SET picture = $1 WHERE id = $2', [pictureUrl, member.id]);
+          member.picture = pictureUrl;
+        }
+        return member;
       } catch (e) {
         console.error('[DB] PostgreSQL insert failed, fallback to local:', e.message);
       }
@@ -153,22 +179,45 @@ const db = {
       name,
       email,
       birthday,
-      picture: picture || '',
+      picture: pictureUrl,
       designation: designation || '',
       created_at: new Date().toISOString()
     };
+    if (photoBuffer) {
+      newMember.photo_data_base64 = photoBuffer.toString('base64');
+      newMember.photo_mime = photoMime;
+      newMember.picture = `/api/members/${newMember.id}/photo`;
+    }
     data.members.unshift(newMember);
     saveLocalData(data);
     return newMember;
   },
 
   async updateMember(id, { name, email, birthday, picture, designation }) {
+    let photoBuffer = null;
+    let photoMime = null;
+    let pictureUrl = picture || '';
+
+    if (pictureUrl.startsWith('data:image/')) {
+      const matches = pictureUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+      if (matches) {
+        photoMime = matches[1];
+        photoBuffer = Buffer.from(matches[2], 'base64');
+        pictureUrl = `/api/members/${id}/photo`;
+      }
+    }
+
     if (isPg && pool) {
       try {
-        const res = await pool.query(
-          'UPDATE members SET name=$1, email=$2, birthday=$3, picture=$4, designation=$5 WHERE id=$6 RETURNING *',
-          [name, email, birthday, picture, designation, id]
-        );
+        let query, params;
+        if (photoBuffer) {
+          query = 'UPDATE members SET name=$1, email=$2, birthday=$3, picture=$4, designation=$5, photo_data=$6, photo_mime=$7 WHERE id=$8 RETURNING id, name, email, birthday, picture, designation, created_at';
+          params = [name, email, birthday, pictureUrl, designation, photoBuffer, photoMime, id];
+        } else {
+          query = 'UPDATE members SET name=$1, email=$2, birthday=$3, picture=$4, designation=$5 WHERE id=$6 RETURNING id, name, email, birthday, picture, designation, created_at';
+          params = [name, email, birthday, pictureUrl, designation, id];
+        }
+        const res = await pool.query(query, params);
         return res.rows[0];
       } catch (e) {
         console.error('[DB] PostgreSQL update failed, fallback to local:', e.message);
@@ -178,9 +227,65 @@ const db = {
     const data = getLocalData();
     const idx = data.members.findIndex(m => m.id == id);
     if (idx !== -1) {
-      data.members[idx] = { ...data.members[idx], name, email, birthday, picture, designation };
+      data.members[idx] = { ...data.members[idx], name, email, birthday, picture: pictureUrl, designation };
+      if (photoBuffer) {
+        data.members[idx].photo_data_base64 = photoBuffer.toString('base64');
+        data.members[idx].photo_mime = photoMime;
+      }
       saveLocalData(data);
       return data.members[idx];
+    }
+    return null;
+  },
+
+  async updateMemberPhoto(id, photoBuffer, photoMime = 'image/webp') {
+    const photoUrl = `/api/members/${id}/photo`;
+    if (isPg && pool) {
+      try {
+        const res = await pool.query(
+          'UPDATE members SET photo_data = $1, photo_mime = $2, picture = $3 WHERE id = $4 RETURNING id, name, email, birthday, picture, designation, created_at',
+          [photoBuffer, photoMime, photoUrl, id]
+        );
+        return res.rows[0];
+      } catch (e) {
+        console.error('[DB] PostgreSQL updateMemberPhoto failed:', e.message);
+      }
+    }
+    
+    const data = getLocalData();
+    const idx = data.members.findIndex(m => m.id == id);
+    if (idx !== -1) {
+      data.members[idx].picture = photoUrl;
+      data.members[idx].photo_data_base64 = photoBuffer.toString('base64');
+      data.members[idx].photo_mime = photoMime;
+      saveLocalData(data);
+      return data.members[idx];
+    }
+    return null;
+  },
+
+  async getMemberPhoto(id) {
+    if (isPg && pool) {
+      try {
+        const res = await pool.query('SELECT photo_data, photo_mime FROM members WHERE id = $1', [id]);
+        if (res.rows[0] && res.rows[0].photo_data) {
+          return {
+            photo_data: res.rows[0].photo_data,
+            photo_mime: res.rows[0].photo_mime || 'image/webp'
+          };
+        }
+      } catch (e) {
+        console.error('[DB] PostgreSQL getMemberPhoto failed:', e.message);
+      }
+    }
+    
+    const data = getLocalData();
+    const member = data.members.find(m => m.id == id);
+    if (member && member.photo_data_base64) {
+      return {
+        photo_data: Buffer.from(member.photo_data_base64, 'base64'),
+        photo_mime: member.photo_mime || 'image/webp'
+      };
     }
     return null;
   },

@@ -6,6 +6,8 @@ const multer = require('multer');
 const fs = require('fs');
 const cloudinary = require('cloudinary').v2;
 
+const sharp = require('sharp');
+
 const db = require('./db');
 const { generateBirthdayCard } = require('./cardGenerator');
 const { sendBirthdayEmail } = require('./resendService');
@@ -15,29 +17,32 @@ const app = express();
 const PORT = process.env.PORT || 5001;
 const BACKEND_URL = process.env.BACKEND_URL || `http://localhost:${PORT}`;
 
-// Resolves a stored picture path to a full URL the backend can loadImage() from
-function resolvePictureUrl(picture) {
+// Resolves a stored picture path to a full URL, Buffer, or path the backend can loadImage() from
+async function resolvePictureUrl(picture, memberId = null) {
+  if (memberId) {
+    const photo = await db.getMemberPhoto(memberId);
+    if (photo && photo.photo_data) return photo.photo_data;
+  }
   if (!picture) return '';
-  if (picture.startsWith('http://') || picture.startsWith('https://')) return picture;
-  // It's a relative path like /uploads/photo-xxx.webp
-  return `${BACKEND_URL}${picture}`;
+  if (picture.startsWith('/api/members/') && picture.endsWith('/photo')) {
+    const match = picture.match(/\/api\/members\/(\d+)\/photo/);
+    if (match) {
+      const photo = await db.getMemberPhoto(match[1]);
+      if (photo && photo.photo_data) return photo.photo_data;
+    }
+  }
+  if (picture.startsWith('http://') || picture.startsWith('https://') || picture.startsWith('data:')) {
+    return picture;
+  }
+  const relativePath = picture.startsWith('/') ? picture : `/${picture}`;
+  const localFilePath = path.join(__dirname, '..', relativePath);
+  if (fs.existsSync(localFilePath)) {
+    return localFilePath;
+  }
+  return '';
 }
 
-// Setup Cloudinary credentials (trimming quotes if present)
-const cloudName = (process.env.CLOUDINARY_CLOUD_NAME || '').replace(/^["']|["']$/g, '').trim();
-const apiKey    = (process.env.CLOUDINARY_API_KEY || '').replace(/^["']|["']$/g, '').trim();
-const apiSecret = (process.env.CLOUDINARY_API_SECRET || '').replace(/^["']|["']$/g, '').trim();
-
-if (cloudName && apiKey && apiSecret) {
-  cloudinary.config({
-    cloud_name: cloudName,
-    api_key: apiKey,
-    api_secret: apiSecret
-  });
-  console.log(`[Cloudinary] Configured for image uploads (Cloud: ${cloudName}).`);
-}
-
-// Multer Storage Configuration (MemoryStorage for Cloudinary streaming)
+// Multer Storage Configuration (MemoryStorage for sharp image resizing)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }
@@ -97,36 +102,54 @@ app.delete('/api/members/:id', async (req, res) => {
   }
 });
 
-// File Upload endpoint for picture (Uploads to Cloudinary & returns secure_url)
+// 2. Photo Upload & Serve Endpoints (Shrinks to 400x400 WebP via sharp and stores in Neon BYTEA)
+app.post('/api/members/:id/photo', upload.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No photo provided' });
+    }
+    const buf = await sharp(req.file.buffer)
+      .resize(400, 400, { fit: 'cover', position: 'center' })
+      .webp({ quality: 80 })
+      .toBuffer();
+
+    const updated = await db.updateMemberPhoto(req.params.id, buf, 'image/webp');
+    res.json({ success: true, data: updated, photoUrl: `/api/members/${req.params.id}/photo` });
+  } catch (err) {
+    console.error('[upload photo error]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/members/:id/photo', async (req, res) => {
+  try {
+    const photo = await db.getMemberPhoto(req.params.id);
+    if (!photo || !photo.photo_data) {
+      return res.status(404).end();
+    }
+    res.set('Content-Type', photo.photo_mime || 'image/webp');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(photo.photo_data);
+  } catch (err) {
+    console.error('[serve photo error]:', err);
+    res.status(404).end();
+  }
+});
+
+// Standalone File Upload endpoint for picture (Shrinks to 400x400 WebP data URL preview)
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
-
-  if (cloudName && apiKey && apiSecret) {
-    try {
-      const uploadPromise = new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          {
-            folder: 'cpp_birthday_cards',
-            resource_type: 'auto'
-          },
-          (error, result) => {
-            if (error) return reject(error);
-            resolve(result);
-          }
-        );
-        stream.end(req.file.buffer);
-      });
-
-      const result = await uploadPromise;
-      console.log('[Cloudinary] Upload success:', result.secure_url);
-      return res.json({ success: true, url: result.secure_url });
-    } catch (err) {
-      console.error('[Cloudinary] Upload error:', err.message || err);
-      return res.status(500).json({ success: false, error: `Cloudinary upload failed: ${err.message || 'Unknown error'}` });
-    }
+  try {
+    const buf = await sharp(req.file.buffer)
+      .resize(400, 400, { fit: 'cover', position: 'center' })
+      .webp({ quality: 80 })
+      .toBuffer();
+    const dataUrl = `data:image/webp;base64,${buf.toString('base64')}`;
+    return res.json({ success: true, url: dataUrl });
+  } catch (err) {
+    console.error('[upload error]:', err);
+    return res.status(500).json({ success: false, error: err.message });
   }
-
-  return res.status(500).json({ success: false, error: 'Cloudinary credentials missing on backend server.' });
 });
 
 // 2. Card Preview Endpoint
@@ -158,10 +181,11 @@ app.post('/api/members/:id/send-card', async (req, res) => {
     if (!member) return res.status(404).json({ success: false, error: 'Member not found' });
 
     const settings = await db.getSettings();
+    const pictureResolved = await resolvePictureUrl(member.picture, member.id);
     const cardBuffer = await generateBirthdayCard({
       name: member.name,
       designation: member.designation,
-      picture: resolvePictureUrl(member.picture),
+      picture: pictureResolved,
       quote: settings.quote_text,
       logoUrl: settings.logo_url
     });

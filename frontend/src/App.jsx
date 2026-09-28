@@ -242,9 +242,16 @@ export default function App() {
     return `${mLabel} ${parseInt(d, 10)}`;
   };
 
-  const resolveAvatar = (picture) =>
-    (picture && picture.replace(/^http:\/\/localhost:\d+/, API_BASE)) ||
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
+  const resolveAvatar = (picture) => {
+    if (!picture) return 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
+    if (picture.startsWith('http://') || picture.startsWith('https://') || picture.startsWith('data:')) {
+      return picture;
+    }
+    if (picture.startsWith('/')) {
+      return `${API_BASE}${picture}`;
+    }
+    return `${API_BASE}/${picture}`;
+  };
 
   const todaysBirthdaysCount = members.filter(m => isBirthdayToday(m.birthday)).length;
   const filteredMembers = members.filter(m =>

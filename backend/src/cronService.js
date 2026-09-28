@@ -3,12 +3,33 @@ const db = require('./db');
 const { generateBirthdayCard } = require('./cardGenerator');
 const { sendBirthdayEmail } = require('./resendService');
 
+const path = require('path');
+const fs = require('fs');
+
 const BACKEND_URL = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5001}`;
 
-function resolvePictureUrl(picture) {
+async function resolvePictureUrl(picture, memberId = null) {
+  if (memberId) {
+    const photo = await db.getMemberPhoto(memberId);
+    if (photo && photo.photo_data) return photo.photo_data;
+  }
   if (!picture) return '';
-  if (picture.startsWith('http://') || picture.startsWith('https://')) return picture;
-  return `${BACKEND_URL}${picture}`;
+  if (picture.startsWith('/api/members/') && picture.endsWith('/photo')) {
+    const match = picture.match(/\/api\/members\/(\d+)\/photo/);
+    if (match) {
+      const photo = await db.getMemberPhoto(match[1]);
+      if (photo && photo.photo_data) return photo.photo_data;
+    }
+  }
+  if (picture.startsWith('http://') || picture.startsWith('https://') || picture.startsWith('data:')) {
+    return picture;
+  }
+  const relativePath = picture.startsWith('/') ? picture : `/${picture}`;
+  const localFilePath = path.join(__dirname, '..', relativePath);
+  if (fs.existsSync(localFilePath)) {
+    return localFilePath;
+  }
+  return '';
 }
 
 /**
@@ -25,10 +46,11 @@ async function triggerBirthdayCheck() {
   for (const member of todaysBirthdays) {
     try {
       console.log(`[Cron] Processing birthday card for ${member.name} (${member.email})...`);
+      const pictureResolved = await resolvePictureUrl(member.picture, member.id);
       const cardBuffer = await generateBirthdayCard({
         name: member.name,
         designation: member.designation,
-        picture: resolvePictureUrl(member.picture),
+        picture: pictureResolved,
         quote: settings.quote_text,
         logoUrl: settings.logo_url
       });
