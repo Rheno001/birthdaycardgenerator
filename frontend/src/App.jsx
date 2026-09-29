@@ -650,7 +650,15 @@ export default function App() {
               <div className="form-group">
                 <label>Profile Photo</label>
                 {memberForm.picture && (
-                  <img src={memberForm.picture} alt="Preview" className="photo-preview-thumb" />
+                  <img
+                    src={resolveAvatar(memberForm.picture)}
+                    alt="Preview"
+                    className="photo-preview-thumb"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.style.display = 'none';
+                    }}
+                  />
                 )}
                 <div style={{ display: 'flex', gap: 8 }}>
                   <input type="text" className="form-input" placeholder="https://... or upload →" value={memberForm.picture} onChange={(e) => setMemberForm({ ...memberForm, picture: e.target.value })} style={{ flex: 1 }} />
