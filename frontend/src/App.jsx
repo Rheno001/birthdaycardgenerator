@@ -66,7 +66,13 @@ export default function App() {
       const data = await res.json();
       if (data.success) {
         setMembers(data.data);
-        if (data.data.length > 0 && !selectedPreviewMember) setSelectedPreviewMember(data.data[0]);
+        if (data.data.length > 0) {
+          setSelectedPreviewMember(prev => {
+            if (!prev) return data.data[0];
+            const found = data.data.find(m => String(m.id) === String(prev.id));
+            return found || data.data[0];
+          });
+        }
       }
     } catch (e) { console.error('Failed to fetch members:', e); }
   };

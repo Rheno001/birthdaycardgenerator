@@ -157,11 +157,12 @@ app.get('/api/card/preview', async (req, res) => {
   try {
     const { name, designation, picture, quote, logoUrl } = req.query;
     const settings = await db.getSettings();
+    const pictureResolved = await resolvePictureUrl(picture);
 
     const cardBuffer = await generateBirthdayCard({
       name: name || 'Team Member Name',
       designation: designation || 'Designation Title',
-      picture: picture || '',
+      picture: pictureResolved,
       quote: quote || settings.quote_text,
       logoUrl: logoUrl || settings.logo_url
     });

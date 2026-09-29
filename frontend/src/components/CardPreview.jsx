@@ -1,5 +1,18 @@
 import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
+const resolveAvatar = (picture) => {
+  if (!picture) return '';
+  if (picture.startsWith('http://') || picture.startsWith('https://') || picture.startsWith('data:')) {
+    return picture;
+  }
+  if (picture.startsWith('/')) {
+    return `${API_BASE}${picture}`;
+  }
+  return `${API_BASE}/${picture}`;
+};
+
 const CardPreview = forwardRef(({ member, quote, logoUrl, width = 1000, height = 800 }, ref) => {
   const canvasRef = useRef(null);
 
@@ -131,7 +144,10 @@ const CardPreview = forwardRef(({ member, quote, logoUrl, width = 1000, height =
     // Member Photo
     if (member?.picture) {
       const img = new Image();
-      img.crossOrigin = 'Anonymous';
+      const resolvedSrc = resolveAvatar(member.picture);
+      if (resolvedSrc && !resolvedSrc.startsWith('data:')) {
+        img.crossOrigin = 'Anonymous';
+      }
       img.onload = () => {
         ctx.save();
         ctx.beginPath();
@@ -162,7 +178,7 @@ const CardPreview = forwardRef(({ member, quote, logoUrl, width = 1000, height =
         drawPhotoPlaceholder(ctx, photoX, photoY, photoW, photoH);
         drawBadge(ctx, member, cppBrandGreen, cppDarkText);
       };
-      img.src = member.picture;
+      img.src = resolvedSrc;
     } else {
       drawPhotoPlaceholder(ctx, photoX, photoY, photoW, photoH);
       drawBadge(ctx, member, cppBrandGreen, cppDarkText);
